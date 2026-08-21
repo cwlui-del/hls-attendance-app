@@ -15,8 +15,8 @@ st.markdown("---")
 # ==========================================================
 # ⚠️ 請在此處填入你剛剛在第二步獲取的 Google 表單隱藏資料！
 # ==========================================================
-FORM_URL = "https://google.com"
-ENTRY_ID = "entry.你的姓名欄位數字編號"
+FORM_URL = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSdjGvXPf9S8-8L6OgK-EFKoKJfqToQfAKuaDWgua_nbPqX9ig/formResponse"
+ENTRY_ID = "entry.0"
 # ==========================================================
 
 # 建立學生輸入表單
