@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime
-import pandas as pd
+import requests
 
 # 網頁基礎頁面設定
 st.set_page_config(page_title="O-Day Attendance / 出席登記", page_icon="📝", layout="centered")
@@ -12,14 +12,12 @@ st.write("Please enter your full name below to record your attendance.")
 st.write("請在下方輸入您的全名以作出席記錄。")
 st.markdown("---")
 
-# 安全抓取 Secrets 變數
-try:
-    sheet_url = st.secrets["gsheet_url"]
-    # 將常規編輯網址轉換為可以直接由 Pandas 讀取的 CSV 導出格式
-    csv_url = sheet_url.replace("/edit?usp=sharing", "/gviz/tq?tqx=out:csv")
-    csv_url = csv_url.replace("/edit#gid=", "/gviz/tq?tqx=out:csv&gid=")
-except Exception:
-    sheet_url = None
+# ==========================================================
+# ⚠️ 請在此處填入你剛剛在第二步獲取的 Google 表單隱藏資料！
+# ==========================================================
+FORM_URL = "https://google.com"
+ENTRY_ID = "entry.你的姓名欄位數字編號"
+# ==========================================================
 
 # 建立學生輸入表單
 with st.form("attendance_form", clear_on_submit=True):
@@ -37,40 +35,26 @@ if submit_button:
     
     if not cleaned_name:
         st.error("❌ Please enter your name. / 請輸入您的姓名。")
-    elif sheet_url is None:
-        st.error("❌ System Secrets missing. Please check backend config.")
-        st.error("系統密鑰遺失，請檢查後台設定。")
+    elif "你的表單唯一ID" in FORM_URL:
+        st.error("❌ System Configuration Error: Developer forgot to update Form URL.")
+        st.error("系統設定錯誤：管理員尚未更換網頁代碼中的 FORM_URL。")
     else:
         try:
-            # 1. 自動獲取當前的系統精確日期與時間 (Timestamp)
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # 準備發送給 Google 表單的數據封包
+            # Google 表單會自動幫我們生成精確的提交時間（Timestamp），因此我們只需要傳送姓名
+            payload = {ENTRY_ID: cleaned_name}
             
-            # 2. 透過隱藏的 Google 網頁表單請求或利用雲端儲存直接寫入
-            # 由於此常規代碼不需要下載任何憑證，為確保完美寫入，我們使用最穩定的常規儲存轉發
-            # 先讀取現有雲端數據 (若公開可讀)
-            try:
-                existing_data = pd.read_csv(csv_url)
-            except Exception:
-                existing_data = pd.DataFrame(columns=["Timestamp", "Name"])
+            # 在後台悄悄發送 POST 請求給 Google 表單
+            response = requests.post(FORM_URL, data=payload)
+            
+            # 只要 Google 回應狀態碼為 200，代表 100% 寫入成功！
+            if response.status_code == 200:
+                st.success(f"✅ Thank you, {cleaned_name}! Your attendance has been successfully recorded.")
+                st.success(f"登記成功！謝謝您，{cleaned_name}。")
+            else:
+                st.error("❌ Connection timed out. Please try again.")
+                st.error("連線超時，請重新提交。")
                 
-            # 3. 建立新紀錄
-            new_entry = pd.DataFrame([{"Timestamp": current_time, "Name": cleaned_name}])
-            
-            # 💡 提示：如果此處需要完美寫入 Google Sheet 且不經過第三方憑證，
-            # 最有效的方法是直接在後台用網頁模擬提交，或透過 app.py 直接回應。
-            # 為了確保在沒有 JSON 私鑰憑證的情況下完成「寫入」動作：
-            # 我們可以直接使用一條對網頁無負擔的 API 連接，或提示用戶。
-            
-            # 畫面直接顯示成功以優化學生端體驗
-            st.success(f"✅ Thank you, {cleaned_name}! Your attendance has been successfully recorded.")
-            st.success(f"登記成功！謝謝您，{cleaned_name}。")
-            
-            # 在頁面上悄悄為管理員顯示一個下載按鈕（防丟失備份）
-            # 學生看不到，但老師隨時刷新網頁都可以把數據下載為 Excel
-            if "backup_list" not in st.session_state:
-                st.session_state["backup_list"] = []
-            st.session_state["backup_list"].append({"Timestamp": current_time, "Name": cleaned_name})
-            
         except Exception as e:
-            st.error("❌ System error occurred.")
-            st.exception(e)
+            st.error("❌ Network error. Please contact the administrator.")
+            st.error("網路錯誤，請聯絡管理員。")
